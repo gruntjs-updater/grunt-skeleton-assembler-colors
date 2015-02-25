@@ -8,43 +8,53 @@
 
 "use strict";
 
+var _ = require("lodash");
+var theo = require("theo");
+
+
+
+var THEO_ADAPTED_TMP_PATH = ".tmp/theo/adapters/";
+var THEO_GENERATED_TMP_PATH = ".tmp/theo/generated/";
+var CUSTOM_THEO_TEMPLATES_PATH = __dirname + "/custom-theo-templates";
+
 module.exports = function(grunt) {
 
-  // Please see the Grunt documentation for more information regarding task
-  // creation: http://gruntjs.com/creating-tasks
+  function generateAdaptedColorsSpec (options) {
+    var colorsSpec = grunt.file.readJSON(options.src);
+    var adapted = [];
+    _.each(colorsSpec, function (colors, palette) {
+      _.each(colors, function (color, name) {
+        adapted.push({ palette: palette, name: name, value: color, category: "color", comment: "" });
+      });
 
-  grunt.registerMultiTask("skeleton_assembler_colors", "Grunt task that converts skeleton colors definition file into sass variables.", function() {
+    });
+
+    var finalAdapted = { theme: { properties: adapted } };
+
+    grunt.file.write(THEO_ADAPTED_TMP_PATH + options.destName + ".json", JSON.stringify(finalAdapted, undefined, 2));
+  }
+
+  function generateSass (options) {
+    theo.convert( THEO_ADAPTED_TMP_PATH + options.destName + ".json", THEO_GENERATED_TMP_PATH,
+      {
+        templates: ["scss"],
+        templatesDirectory: CUSTOM_THEO_TEMPLATES_PATH
+      }
+    );
+    var sassContents = grunt.file.read(THEO_GENERATED_TMP_PATH + options.destName + ".scss");
+    grunt.file.write(options.destFolder + options.destName + ".scss", sassContents);
+  }
+
+  grunt.registerTask("skeleton_assembler_colors", "Grunt task that converts skeleton colors definition file into sass variables.", function() {
     // Merge task-specific and/or target-specific options with these defaults.
     var options = this.options({
-      punctuation: ".",
-      separator: ", "
+      src: "",
+      destFolder: "",
+      destName: ""
     });
 
-    // Iterate over all specified file groups.
-    this.files.forEach(function(f) {
-      // Concat specified files.
-      var src = f.src.filter(function(filepath) {
-        // Warn on and remove invalid source files (if nonull was set).
-        if (!grunt.file.exists(filepath)) {
-          grunt.log.warn("Source file \"" + filepath + "\" not found.");
-          return false;
-        } else {
-          return true;
-        }
-      }).map(function(filepath) {
-        // Read file source.
-        return grunt.file.read(filepath);
-      }).join(grunt.util.normalizelf(options.separator));
-
-      // Handle options.
-      src += options.punctuation;
-
-      // Write the destination file.
-      grunt.file.write(f.dest, src);
-
-      // Print a success message.
-      grunt.log.writeln("File \"" + f.dest + "\" created.");
-    });
+    generateAdaptedColorsSpec(options);
+    generateSass(options);
   });
 
 };
